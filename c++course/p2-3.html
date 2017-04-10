@@ -1,0 +1,1102 @@
+<html>
+<head>
+
+  <meta http-equiv="Content-Type" content="text/html; charset=koi8-r">
+  <meta name="Author" content="Владимир Ольшевский">
+  <title>C++, part 2, lesson 3</title>
+  <link rel="stylesheet" href="../styles/lectures.css" type="text/css">
+
+</head>
+
+<body bgcolor="#ffffff">
+
+<div align="center">
+<table width="700" cols=1 border=0>
+   <tr>
+      <td>
+	<h1 align="center">
+	 <a href="../c++course.1">C++</a>
+	</h1>
+        <h3 align="center">часть 2, занятие 3</h3>
+        <div align="center"> Владимир Ольшевский </div>
+      </td>
+   </tr>
+</table>
+<br><br><br>
+<table width="50%" border="0" cellspacing="1" cellpadding="3" align="Center">
+  <caption>В этой лекции</caption>
+  <tr>
+    <td>
+      <ul>
+        <li>Динамическая память, С++-стиль (С++ Free Store)
+	<ul>
+          <li><a href="p2-3.html#freestore">Основные факты</a>
+          <li><a href="p2-3.html#exhaust">Когда памяти не хватило ...</a>
+	  <ul>
+	    <li><a href="p2-3.html#exhaustdef">Поведение по умолчанию - исключение</a>
+	    <li><a href="p2-3.html#exhaustnull">A'la C проверка на 0</a>
+	    <li><a href="p2-3.html#exhausthandler">new_handler() - назначение своего 
+	        обработчика исчерпания памяти</a>
+          </ul> 
+	</ul>
+	<li>С++-класс - потомок С-структуры</a>
+	  <ul>
+	    <li><a href="p2-3.html#class">Введение</a>
+	    <li><a href="p2-3.html#class_c">С-стиль (процедурный)</a>
+	    <li><a href="p2-3.html#class_cpp">С++-стиль (объектный)</a>
+	    <li><a href="p2-3.html#class_diff">Различия двух стилей</a>
+	    <li><a href="p2-3.html#class_access">Права доступа</a>
+	    <li><a href="p2-3.html#class_struct_diff">
+	        Чем структура отличается от класса?</a>
+	    <li><a href="p2-3.html#class_friends">Друзья классов</a>
+          </ul>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+<!--
+Внести во вторую лекцию
+           set_terminate()
+           set_unexpected()
+-->
+<hr align="center" width="50%">
+<h1 align="center"><a name="freestore"></a>
+     Динамическая память, С++-стиль (С++ Free Store)</h1>
+<br>
+   <table width="700" border="0" cellspacing="0" cellpadding="0">
+      <tr>
+         <td align="justify">
+            <h2>Основные факты</h2>
+
+<p>
+
+В С,  когда требуется динамически  создавать и уничтожать  объекты, мы
+пользуемся функциями стандартной библиотеки <em>malloc()</em> и 
+<em>free()</em>:
+
+<div class="incode">
+           /* Allocate array of 100 chars */<br>
+           char *p = malloc(100);<br>
+           /* Free array */<br>
+           free(p);<br>
+</div>
+
+В С++ для этой цели  предусмотрены специальные операторы - <em>new</em>, 
+<em>delete</em> для одиночных объектов, и <em>new[]</em>,  
+<em>delete[]</em> - для массивов.  Сначала мы
+посмотрим,  как ими пользуются  в обычной  ситуации -  когда свободной
+памяти достаточно  для создания нужного  объекта. Затем мы  перейдем к
+более сложному  вопросу -  как ведет себя  <em>new</em> при  нехватке 
+свободной памяти. Тут мне поневоле  придется коснуться возможностей 
+перегрузки и замещения операторов  <em>new</em> и <em>delete</em>,  
+но я постараюсь  быть максимально
+прагматичным  и рассказать  вам ровно  столько, сколько  требуется для
+настройки поведения этих операторов под свои нужды.
+
+</p><p>
+
+Пользуются этими операторами следующим образом:
+<div class="code">
+    int *pint;<br>
+<br>
+    // Allocate one int<br>
+    pint = new int;<br>
+    // Use it.<br>
+    *pint = 1;<br>
+    // Free it, set pointer to 0 <br>
+    delete pint;<br>
+    pint = 0;<br>
+<br>
+    // Allocate array of 10 int's<br>
+    pint = new int[10];<br>
+    // Use array<br>
+    for (int i=0; i&lt;10; i++)<br>
+    &nbsp;&nbsp;pint[i] = i;<br>
+    // Free it, set pointer to 0<br>
+    delete[] pint;<br>
+    pint = 0;<br>
+</div>
+На что здесь стоит обратить внимание?
+
+</p><p>
+
+Во-первых,  изменился  синтаксис.  Мы  теперь вместо  вызовов  функций
+пользуемся  операторами.   Оператору  <em>new</em>  мы   говорим,  
+какого  типа
+переменную надо  создать, и он  возвращает нам указатель на  нее. Если
+нам  надо   создать  массив,   мы  после  типа   переменной  указываем
+размерность массива  - этот  вариант оператора называется  <em>new[]</em>.  
+Для
+уничтожения объекта или массива  мы используем соответственно <em>delete</em>
+и <em>delete[]</em>. Во втором случае размерность уничтожаемого массива в 
+угловых
+скобках  не указывается.  Путать  операторы для  одиночных объектов  и
+массивов  не стоит  - если  вы создали  объект с  помощью <em>new[]</em>,  
+то и уничтожать его надо с помощью <em>delete[]</em>, а не <em>delete</em>.
+
+</p><p>
+
+Во-вторых,  работаем  мы по-прежнему  с  указателями,  и после  вызова
+<em>delete</em>  засылаем в  недействительный указатель  0. Это  те  
+же правила
+"хорошего  тона" при  работе  с указателями,  что  и в  С.   Но в  С++
+недействительные   указатели  принято   помечать  0   (нулем),   а  не
+символической    константой   <em>NULL</em>    -    это   вызвано    
+спецификой
+объектно-ориентированных  возможностей  языка  (по  правде  говоря,  я
+частенько пользую <em>NULL</em>  в С++ коде и пока ни разу  не имел 
+проблем, но гуру Страуструп не рекомендует...).
+
+</p><p>
+
+Если вы  работаете с одиночными  объектами, то у вас  есть возможность
+совместить  динамическое создание  объекта с  его  инициализацией, для
+этого  в операторе  new  после имени  требуемого  типа надо  поставить
+значение в круглых скобках:
+
+<div class="incode">
+           // Allocate one int, initialize it with value 10<br>
+           int *pint = new int(10);<br>
+</div>
+
+При работе  с массивами у вас  такой возможности нет  - в динамический
+массив  значения   придется  засылать   в  цикле  (более   точно,  для
+пользовательских типов  все элементы массива  могут инициализироваться
+некоторым предопределенным значением,  но это значение указывается при
+разработке пользовательского типа, а не в операторе <em>new[]</em>).
+</p>
+    </td>
+  </tr>
+</table>
+
+<br>
+
+<table width="700" border="0" cellspacing="0" cellpadding="0">
+   <tr>
+      <td align="justify">
+         <h2><a name="exhaust"></a>Когда памяти не хватило ...</h2>
+<p>
+
+Все это несложно  и во многом напоминает работу с <em>alloc()</em> и 
+<em>free()</em> -
+до  тех пор,  пока  свободной памяти  достаточно  для нужд  программы.
+Однако  любая  серьезная программа  обязана  хоть как-то  обрабатывать
+ситуацию, когда свободная память оказывается исчерпанной.
+
+</p><p>
+
+В  С-стиле  мы для  этого  просто  проверяли,  не вернула  ли  функция
+<em>malloc()</em> недействительный указатель:
+
+<div class="code">
+         ...<br>
+         char *p;<br>
+         p = malloc(100);<br>
+         if (p == NULL) {<br>
+         &nbsp;&nbsp;/* <br>
+         &nbsp;&nbsp;&nbsp;&nbsp;Свободная память кончилась, надо <br>
+         &nbsp;&nbsp;&nbsp;&nbsp;что-то делать<br>
+         &nbsp;&nbsp;*/<br>
+         &nbsp;&nbsp;... <br>
+         }<br>
+         ...<br>
+</div>
+
+В  С++-стиле  в  этом  случае  возможных  вариантов  развития  событий
+несколько, причем поведение по умолчанию не такое, как в С. Однако это
+поведение по  умолчанию можно  изменить, правда это  требует некоторых
+усилий со стороны программиста.
+
+</p>
+
+            <h3><a name="exhaustdef"></a>
+	    Поведение по умолчанию - исключение
+	    </h3>
+
+
+<p>
+
+Многие программы на С, особенно из  тех, что пишутся "на коленке" и на
+один  раз, пренебрегают  проверками ошибок  после  вызова библиотечных
+функций  (это  касается,  кстати,  не  только  работы  с  динамической
+памятью). И  дело не только  в опыте и  добросовестности разработчиков
+программ  -  просто  сам  механизм  работы с  ошибками  в  С  зачастую
+оказывается  слишком  обременительным.    Так,  даже  если  вы  хотите
+всего-навсего  аварийно завершить программу  при нехватке  памяти, вам
+нужно  написать вместо  одной строки  две -  и так  при  каждом вызове
+<em>malloc()</em>:
+
+<div class="incode">
+         char *p = malloc(1000);<br>
+         assert(p!=NULL);     /* abort with diag. msg on failure */<br>
+</div>
+
+Исключения  в С++  помогают справиться  с  этой проблемой.  Как я  уже
+рассказывал на прошлом  занятии, неперехваченное исключение приводит к
+аварийному  завершению программы,  что  во многих  случаях  как раз  и
+является приемлемой  стратегией обработки ошибок.  Вполне естественно,
+что оператор <em>new</em> при  нехватке памяти генерирует исключение. 
+Например,
+такая  программа,  исчерпав доступную  память,  аварийно завершится  с
+записью образа памяти:
+
+<div class="code">
+        // exhaust1.cc <br>
+        #include &lt;iostream><br>
+        using namespace std;<br>
+<br>
+        void getchunk() {<br>
+        &nbsp;&nbsp;static int n = 0;<br>
+        &nbsp;&nbsp;char *p = new char[1024*1024];<br>
+        &nbsp;&nbsp;cerr &lt;&lt; ++n &lt;&lt; "MB OK" &lt;&lt; endl;<br>
+        }<br>
+<br>
+        // Do not forget 'limit coredumpsize 0' 'limit datasize 100'<br>
+        main() {<br>
+        while (1)<br>
+        &nbsp;&nbsp;getchunk();<br>
+        }<br>
+</div>
+Взгляните сами на результат ее работы:
+
+<div class="session">
+        longrun>./exhaust1<br>
+        1MB OK<br>
+        2MB OK<br>
+        ...<br>
+        96MB OK<br>
+        97MB OK<br>
+        Аbort (core dumped)<br>
+        longrun><br>
+</div>
+
+Так что вы  можете и не напрягаться по  части проверки результата new,
+когда подобного поведения достаточно.
+
+</p><p>
+
+Естественно, исключение  от new можно  перехватить. Если вы  при любом
+исключении (не только от операторов  <em>new</em>) собираетесь делать 
+одно и то
+же, то вам даже не нужно знать тип исключения, достаточно использовать
+универсальный обработчик <em>catch(...)</em>.
+
+<div class="code">              
+        // exhaust2.cc <br>
+<br>
+        // same as in exhaust1.cc<br>
+        ... <br>
+<br>
+        main() {<br>
+        &nbsp;&nbsp;while (1)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;try {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;getchunk();<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;catch(...) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cerr &lt;&lt; "free memory ehxausted" &lt;&lt;endl;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;abort();<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+        }<br>
+</div>
+
+Если же в  программе нужно обрабатывать исключения от  <em>new</em> 
+отдельно от
+других, вам потребуется обработчик  для исключения <em>bad_alloc</em>, 
+при этом
+в программу надо включить  заголовочный файл &lt;new>, где определен этот
+тип исключения.
+
+<div class="code">
+        // exhaust2.cc <br>
+        #include &lt;new><br>
+        // same as in exhaust1.cc<br>
+        ... <br>
+<br>
+        main() {<br>
+        &nbsp;&nbsp;while (1)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;try {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;getchunk();<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;catch(bad_alloc) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cerr &lt;&lt; "Allocation failed" &lt;&lt;endl;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;abort();<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+        }<br>
+</div>
+
+Вот какой вывод вы получите в этом случае:
+
+<div class="session">
+        longrun>./exhaust1<br>
+        1MB OK<br>
+        2MB OK<br>
+        ...<br>
+        96MB OK<br>
+        97MB OK<br>
+        Allocation failed<br>
+        Аbort (core dumped)<br>
+        longrun><br>
+</div>
+
+Все это пока были разные варианты использования поведения по умолчанию
+- все они основывались на механизме С++-исключений.
+
+</p>
+
+            <h3><a name="exhaustnull"></a>
+                A'la C проверка на 0
+	    </h3>
+
+Случается,  когда  при   исчерпании  свободной  памяти  желательно  не
+обрабатывать исключения, а  проверять указатель от new на  0, так, как
+это делается в С. Тут у вас есть две возможности.
+
+</p><p>
+
+Первая   -  при   каждой  попытке   захвата   использовать  специально
+предназначенные  для этого версии  операторов <em>new</em> с 
+параметром <em>nоthrow</em>
+(объявления этих версий лежат в заголовочном файле &lt;new>):
+<div class="code">
+        // exhaust3.cc<br>
+        #include &lt;new><br>
+        #include &lt;iostream><br>
+        using namespace std;<br>
+<br>
+        void getchunk() {<br>
+        &nbsp;&nbsp;static int n = 0;<br>
+        &nbsp;&nbsp;char *p = new(nothrow) char[1024*1024];<br>
+        &nbsp;&nbsp;if (p!=0)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;cerr &lt;&lt; ++n &lt;&lt; "MB OK" &lt;&lt; endl;<br>
+        &nbsp;&nbsp;else {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;cerr &lt;&lt; "new returned 0" &lt;&lt; endl;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;exit (0);<br>
+        &nbsp;&nbsp;}<br>
+        }<br>
+<br>
+        main() {<br>
+        &nbsp;&nbsp;while (1)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;getchunk();<br>
+        }
+</div>
+
+Такой  оператор  - <em>new(nothrow)</em>  или  
+<em>new(nothrow)[]</em>  - исключений  не
+возбуждает,  а  возвращает  0,  если  выполнить  запрос  программы  не
+удалось. Недостаток подобного способа  - вам придется везде вместо new
+писать <em>new(nothrow)</em>.
+
+</p><p>
+
+Вторая  возможность  -  заменить  стандартный оператор  <em>new</em>
+на  свой,
+который будет возвращать 0 при ошибке. Для этого надо написать функции
+с прототипами
+
+<div class="incode">
+        void *operator new(size_t sz);
+</div>
+
+и
+
+<div class="incode">
+        void *operator new[](size_t sz);
+</div>
+
+Именно этими функциями пользуются операторы <em>new</em> 
+и <em>new[]</em>, передавая им
+в параметре размер требуемой области в байтах.
+
+</p><p>
+
+Разумеется,  я   не  призываю  вас  писать  свой   алгоритм  работы  с
+динамической памятью.  Этого как  раз делать не стоит, поскольку новый
+<em>new</em>  заменит собой стандартный  не только  
+в вашей  программе, но  и в
+библиотеках.   Однако   немного   схитрить  и   подправить   поведение
+стандартного <em>new</em> можно без особого риска - достаточно 
+воспользоваться внутри него версией new(nothrow):
+
+<div class="code">
+        // exhaust3-1.cc<br>
+        #include &lt;new><br>
+        #include &lt;iostream><br>
+        using namespace std;<br>
+<br>
+        void *operator new(size_t sz) {<br>
+        &nbsp;&nbsp;cerr &lt;&lt; "Global custom new called"&lt;&lt; endl;<br>
+        &nbsp;&nbsp;return operator new(sz,nothrow);<br>
+        }<br>
+<br>
+        void *operator new[](size_t sz) {<br>
+        &nbsp;&nbsp;cerr &lt;&lt; "Global custom new[] called"&lt;&lt; endl;<br>
+        &nbsp;&nbsp;return operator new[](sz,nothrow);<br>
+        }<br>
+<br>
+        void getchunk() {<br>
+        &nbsp;&nbsp;static int n = 0;<br>
+        &nbsp;&nbsp;char *p = new char[1024*1024];<br>
+        &nbsp;&nbsp;if (p!=0)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;cerr &lt;&lt; ++n &lt;&lt; "MB OK" &lt;&lt; endl;<br>
+        &nbsp;&nbsp;else {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;cerr &lt;&lt; "new returned 0" &lt;&lt; endl;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;exit (0);<br>
+        &nbsp;&nbsp;}<br>
+        }<br>
+<br>
+        main() {<br>
+        &nbsp;&nbsp;while (1)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;getchunk();<br>
+        }<br>
+</div>
+
+Вот  как  выглядит вывод  последнего  варианта программы  (разумеется,
+сообщения   "Global  ..."  я   вставил  в   свои  операторы   new  для
+нагладности):
+
+<div class="session">
+        longrun>./exhaust3-1.cc<br>
+        Global custom new[] called<br>
+        1MB OK<br>
+        Global custom new[] called<br>
+        2MB OK<br>
+        ...<br>
+        96MB OK<br>
+        Global custom new[] called<br>
+        97MB OK<br>
+        Global custom new[] called<br>
+        new returned 0<br>
+        longrun><br>
+</div>
+
+Для  полноты  картины скажу,  что  на  этом  возможности по  настройке
+глобальных операторов  <em>new</em> под нужды программы  не 
+исчерпываются.  Эти
+операторы  можно  не только  замещать  своими,  но  и писать  для  них
+перегруженные (overloaded)  версии. Кстати,  <em>new</em> и 
+<em>new(nothrow)</em>  - это
+как раз примеры перегруженных функций для оператора <em>new</em>.
+
+</p><p>
+
+Что касается глобальных <em>delete</em> и <em>delete[]</em> - 
+их тоже можно заменить на
+свои, но подобная потребность возникает еще реже, чем в 
+случае с <em>new</em>. 
+
+</p>
+
+            <h3><a name="exhausthandler"></a>
+	       new_handler() - назначение своего обработчика 
+	       исчерпания памяти
+	    </h3>
+
+
+<p>
+
+
+Последнее, о чем я хочу  рассказать в этом разделе - это возможность
+назначать свой  обработчик на  случай нехватки свободной  памяти. Речь
+здесь  пойдет не  о <em>catch()</em>,  а  еще об одной  возможности, 
+действующей
+совместно  с  исключениями и  дополняющей  их  механизм  при работе  со
+свободной памятью. Для этого надо проделать две вещи.
+
+</p><p>
+
+Во  первых,  написать  саму  функцию-обработчик с  типом  
+<em>void&nbsp;(*)()</em>, например,
+
+<div class="incode">
+        void exhaustion() {<br>
+        &nbsp;&nbsp;// some code for handling exhaustion<br>
+        }<br>
+</div>
+
+Во вторых,  вызвать в программе функцию <em>set_new_handler</em>,  
+передав ей в качестве параметра ваш обработчик:
+
+<div class="incode">
+        set_new_handler(exhaustion);
+</div>
+
+После этого оператор <em>new</em> будет вызывать назначенную функцию 
+всякий раз
+при нехватке памяти,  а по выходу из нее -  повторять попытку. Вот как
+выглядит вся программа, использующая этот механизм:
+
+<div class="code">
+        // exhaust4.cc - using set_new_handler()<br>
+        #include &lt;new><br>
+        #include &lt;iostream><br>
+        using namespace std;<br>
+<br>
+        void exhaustion() {<br>
+        &nbsp;&nbsp;static int i = 0;<br>
+        &nbsp;&nbsp;cerr &lt;&lt; "exhaustion called " &lt;&lt; ++i &lt;&lt; " time"&lt;&lt; endl;<br>
+        &nbsp;&nbsp;if (i==3)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;set_new_handler(0);<br>
+        }<br>
+<br>
+        void getchunk() {<br>
+        &nbsp;&nbsp;static int n = 0;<br>
+        &nbsp;&nbsp;char *p = new char[1024*1024];<br>
+        &nbsp;&nbsp;cerr &lt;&lt; ++n &lt;&lt; "MB OK" &lt;&lt; endl;<br>
+        }<br>
+<br>
+        main() {<br>
+        &nbsp;&nbsp;set_new_handler(exhaustion);<br>
+        &nbsp;&nbsp;try {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;while (1)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;getchunk();<br>
+        &nbsp;&nbsp;}<br>
+        &nbsp;&nbsp;catch (bad_alloc) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;cerr &lt;&lt; "Allocation failed " &lt;&lt; endl;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;exit(0);<br>
+        &nbsp;&nbsp;}<br>
+        }<br>
+</div>
+
+Оттранслировав и запустив ее, вы увидите следующее: 
+
+<div class="session">
+        longrun>./exhaust4<br>
+        1MB OK<br>
+        2MB OK<br>
+        ...<br>
+        96MB OK<br>
+        97MB OK<br>
+        exhaustion called 1 time<br>
+        exhaustion called 2 time<br>
+        exhaustion called 3 time<br>
+        Allocation failed<br>
+        longrun><br>
+</div>
+
+Идея здесь  такова: - когда вся свободная  память исчерпана, программа
+получает  шанс  исправить  ситуацию.   Например, освободить  в  вызове
+назначенного    с    помощью    <em>set_new_handler()</em>   обработчика
+уже
+неиспользуемые динамические массивы.  После чего оператор <em>new</em> 
+повторит
+попытку.   Если   же  исправить   ситуацию   не   удается,  то   вызов
+<em>set_new_handler(0)</em> восстановит поведение оператора <em>new</em> 
+по умолчанию. В приведенном  примере функция  <em>exhaustion()<em>  
+трижды пыталась  исправить
+ситуацию (делала  вид, а на самом деле  печатала сообщение "exhaustion
+called ..."), после чего вызвала <em>set_new_handler(0)</em>, так что 
+очередная
+попытка  оператора  <em>new</em> возбудила,  наконец,  исключение, 
+и  программа завершилась с сообщением "Allocation failed".
+
+</p><p>
+
+Давайте  на этом  закончим разговор  о свободной  памяти и  перейдем к
+следующей  теме.  Пришла  наконец,  пора  знакомиться с  тем,  как  же
+устроены пользовательские типы данных в С++.
+</p>
+    </td>
+  </tr>
+</table>
+
+<br><br><br>
+<hr align="center" width="50%">
+<h1 align="center"><a name="class"></a>С++-класс - потомок С-структуры</h1>
+<br>
+
+<table width="700" border="0" cellspacing="0" cellpadding="0">
+   <tr>
+      <td align="justify">
+      <h2>Введение</h2>
+<p>
+
+Структура в С позволяет объединять в одну логическую единицу несколько
+элементов  данных  (их  принято  называть полями  данных,  или  просто
+полями).   Эти поля  могут быть  либо встроенных  типов, либо,  в свою
+очередь,  другими  структурами.    Таким  образом,  помещая  логически
+связанные переменные в структуры, программист создает в С сложные типы
+данных. Однако при этом функции, которые работают с этими "логическими
+единицами",  отделены  в С  от  структур,  так  что всегда  существует
+опасность    использования   функции    с   неподходящими    для   нее
+данными. Такова ситуация в С и во всех процедурных языках.
+
+</p><p>
+
+Объектно-ориентированные языки пытаются  решить эту проблему, увязывая
+в одну логическую единицу поля данных с методами (так называют функции
+для  обработки полей).  В терминах  С++  это означает,  что вы  можете
+включать в структуру методы наравне с полями данных.
+
+</p><p>
+
+Вот два примера, которые, я надеюсь,  помогут понять разницу между
+традиционным процедурным подходом С и объектно-ориентированным
+подходом С++.
+</p>
+    </td>
+  </tr>
+</table>
+
+<br>
+
+<table width="700" border="0" cellspacing="0" cellpadding="0">
+   <tr>
+      <td align="justify">
+         <h2><a name="class_c"></a>С-стиль (процедурный)</h2>
+<p>
+
+
+Приведенная ниже программа печатает таблицу значений трех линейных
+функций, задаваемых коэффициентами <em>a</em> и <em>b</em>. Обратите 
+внимание - мы
+должны задавать коэффициенты при каждом вызове функции:
+
+<div class="code">
+       // linear-c.cc<br>
+       #include &lt;iostream><br>
+       using namespace std;<br>
+<br>
+       // Generalized form of linear function<br>
+       double f(double a, double b, double x) {<br>
+       &nbsp;&nbsp;return a*x + b;<br>
+       }<br>
+<br>
+       main() {<br>
+       &nbsp;&nbsp;double a1,b1,a2,b2,a3,b3;<br>
+ <br>
+       &nbsp;&nbsp;// Set coefficients for three funcs<br>
+       &nbsp;&nbsp;a1=1; b1=1;         // x+1<br>
+       &nbsp;&nbsp;a2=-1; b2=1;        // -x+1<br>
+       &nbsp;&nbsp;a3=1; b3=0;         // x<br>
+<br>
+       &nbsp;&nbsp;// Calcullate and print table<br>
+       &nbsp;&nbsp;char tab = '\t'; // tabulation - for pretty output<br>
+<br>
+       &nbsp;&nbsp;// Print table heading<br>
+       &nbsp;&nbsp;cout &lt;&lt; x &lt;&lt; tab &lt;&lt; f1 &lt;&lt; tab &lt;&lt; f2 &lt;&lt; tab &lt;&lt; f3 &lt;&lt; endl;<br>
+<br>
+       &nbsp;&nbsp;for (double x=0.1; x&lt;=0.9; x += 0.1) {<br>
+       &nbsp;&nbsp;&nbsp;&nbsp;cout &lt;&lt; x &lt;&lt; tab <br>
+       &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;&lt; f(a1,b1,x) &lt;&lt; tab<br>
+       &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;&lt; f(a2,b2,x) &lt;&lt; tab<br>
+       &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;&lt; f(a3,b3,x) &lt;&lt; endl;<br>
+       &nbsp;&nbsp;}<br>
+       } <br>
+ </div>
+
+Разумеется, эта программа напечатает таблицу. Однако, в таком коде так
+легко по ошибке написать в одном из вызовов <em>f(a1,b2,x)</em>. 
+</p>
+    </td>
+  </tr>
+</table>
+
+<br>
+
+<table width="700" border="0" cellspacing="0" cellpadding="0">
+   <tr>
+      <td align="justify">
+         <h2><a name="class_cpp"></a>С++-стиль (объектный)</h2>
+<p>
+
+Второй    пример   -   объектно-ориентированная    версия   предыдущей
+программы.  Структура  <em>FUNCTION</em>  содержит  поля  данных  
+(коэффициенты линейной функции) и так  называемые функции-члены 
+(member functions) -
+методы  для работы с  этими полями.  Таким образом,  каждая переменная
+типа <em>FUNCTION</em>  представляет собой одну  из линейных функций.  
+Вот как выглядит определение структуры <em>FUNCTION</em>:
+
+<div class="code">
+         struct FUNCTION {<br>
+         &nbsp;&nbsp;double coeff1,coeff2; // coefficients<br>
+<br>
+         &nbsp;&nbsp;// Inline member functions for setting coefficients<br>
+         &nbsp;&nbsp;void set(double a) {<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;coeff1 = a;<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;coeff2 = 0;<br>
+         &nbsp;&nbsp;}<br>
+<br>
+         &nbsp;&nbsp;void set(double a, double b) {<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;coeff1 = a;<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;coeff2 = b;<br>
+         &nbsp;&nbsp;}<br>
+<br>
+         &nbsp;&nbsp;// function declaration for calcullating ax+b<br>
+         &nbsp;&nbsp;double f(double x);<br>
+         };<br>
+<br>
+         double FUNCTION::f(double x)  {<br>
+         &nbsp;&nbsp;return coeff1*x + coeff2;<br>
+         }<br>
+</div>
+
+А вот и сама программа, которая пользуется этим типом данных для
+печати таблицы:
+
+<div class="code">
+         #include &lt;iostream><br>
+<br>
+         ... // Deinition of struct FUNCTION (shown above)<br>
+<br>
+         main() {<br>
+         &nbsp;&nbsp;// Create variables (f2 created on free store)<br>
+         &nbsp;&nbsp;FUNCTION f1, *f2, f3;<br>
+         &nbsp;&nbsp;f2 = new FUNCTION;<br>
+<br>
+         &nbsp;&nbsp;// Set coefficients<br>
+         &nbsp;&nbsp;f1.set(1, 1);  //  x+1<br>
+         &nbsp;&nbsp;f2->set(-1,1); // -x+1<br>
+         &nbsp;&nbsp;f3.set(1);     //  x<br>
+<br>
+         &nbsp;&nbsp;// Calcullate and print table<br>
+<br>
+         &nbsp;&nbsp;char tab = '\t'; // tabulation - for pretty output<br>
+         <br>
+         &nbsp;&nbsp;// Print table heading<br>
+         &nbsp;&nbsp;cout &lt;&lt; "x" &lt;&lt; tab &lt;&lt; "f1" &lt;&lt; tab &lt;&lt; "f2" &lt;&lt; tab &lt;&lt; f3 &lt;&lt; endl;<br>
+<br>
+         &nbsp;&nbsp;// Print table data<br>
+         &nbsp;&nbsp;for (double x=0.1; x&lt;=0.9; x += 0.1) {<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;cout &lt;&lt; x &lt;&lt; tab <br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;&lt; f1.f(x) &lt;&lt; tab<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;&lt; f2->f(x) &lt;&lt; tab<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;&lt; f3.f(x) &lt;&lt; endl;<br>
+       &nbsp;&nbsp;}<br>
+<br>
+       &nbsp;&nbsp;// f2 not needed anymore - release memory<br>
+       &nbsp;&nbsp;delete f2;<br>
+       }<br>
+</div>
+
+Этот второй  пример выглядит понятней первого. Что  особенно приятно -
+он   еще  и   надежнее,  поскольку   в  нем   функции,   работающие  с
+коэффициентами, теперь  стали частью  самой структуры. Один  раз задав
+коэффициенты, мы  больше не  рискуем из-за опечатки  получить значения
+какой-нибудь другой функции.
+</p>
+    </td>
+  </tr>
+</table>
+
+<br>
+
+<table width="700" border="0" cellspacing="0" cellpadding="0">
+   <tr>
+      <td align="justify">
+         <h2><a name="class_diff"></a>Различия двух стилей</h2>
+<p>
+
+
+Давайте теперь повнимательнее поглядим  на то новое, чем второй пример 
+отличается от примера в стиле С.
+
+</p><p>
+
+Первое, и,  разумеется, главное отличие - это  функции, которые теперь
+включены   в  структуру.   Причем  эти   функции   определяются  двумя
+способами.   Тела    двух   перегруженных   функций    <em>set(double)</em>
+и <em>set(double,double)</em>  включены   прямо  в  определение   
+структуры.  Что
+касается  функции   <em>f()</em>,  то   в  структуре  присутствует   
+только  ее
+объявление, само же тело определено отдельно:
+
+<div class="incode">
+         double FUNCTION::f(double x)  {<br>
+         &nbsp;&nbsp;return coeff1*x + coeff2;<br>
+         }<br>
+</div>
+
+При этом нам пришлось поставить перед именем функции квалификатор 
+<em>FUNCTION::</em>, чтобы
+указать, к какой именно структуре эта функция относится.
+
+</p><p>
+
+Между  двумя этими  способами определения  функций-членов  есть важное
+различие - если функция  определяется прямо в структуре, то транслятор
+делает ее inline-функцией  (то есть, код ее тела  встраивается прямо в
+место вызова. С определенной же отдельно функцией транслятор поступает
+привычным способом - создает код ее тела в одном экземпляре, а в места
+вызовов вставляет обращения к этому коду.
+
+</p><p>
+
+Второе отличие (не отраженное, впрочем, в примере в С-стиле) -
+определив один раз структуру, мы дальше создаем переменные такого типа
+без указания ключевого слова <em>struct</em>:
+
+<div class="incode">
+    FUNCTION f1;  // inC, we would write struct FUNCTION f1;
+</div>
+        
+Это делает определенный нами тип <em>FUNCTION</em> более похожим 
+(пока только внешне) на встроенные типы данных.
+
+</p><p>
+
+Что  же касается  использования функций-членов,  оно  очень напоминает
+использование полей  данных - мы  так же используемоператор  доступа к
+полю (<em>.</em> или <em>-></em>), но после него ставим не имя поля данных, 
+а функцию:
+
+<div class="incode">
+       f1.f(x);<br>
+       f2->f(x);<br>
+</div>
+
+Особенно приятно, что при вызове функций-членов нам не нужно указывать,
+из  какой   именно  структуры  нужно  брать  поля   данных  -  функция
+оказывается связанной  с той  структурой, которую использовали  для ее
+вызова. Так, если  мы пишем <em>f1.f(x)</em>, то  функция <em>f</em> 
+будет использовать
+коэффициенты именно из структуры <em>f1</em>, а не из <em>f2</em> 
+или <em>f3</em>.
+</p>
+    </td>
+  </tr>
+</table>
+
+<br>
+
+<table width="700" border="0" cellspacing="0" cellpadding="0">
+   <tr>
+      <td align="justify">
+         <h2><a name="class_access"></a>Права доступа</h2>
+<p>
+
+То,  что  методы (функции-члены)  теперь  связаны  с  полями данных  -
+безусловный плюс. Теперь можно,  один раз их хорошо продумав, работать
+с  полями  только  через  них,  избегая  таким  образом  ошибок  из-за
+некорректных действий  с данными.  Однако пока-что ничто  не запрещает
+использовать поля данных и напрямую, как в С. Например
+
+<div class="incode">
+             f1.coeff1 = 0.0;
+</div>
+
+А подобный  "прямой доступ" к  данным может легко уничтожить  все ваши
+труды  по продумыванию  алгоритмов работы  с данными.  Чтобы  вы могли
+избежать подобных неприятностей, С++ позволяет назначать права доступа
+к  данным  и  функциям.  Это воплощение  еще  одного  фундаментального
+принципа   объектно-ориентированного   программирования   -   сокрытия
+информации (information hiding).
+
+</p><p>
+
+Итак, если  вы хотите сделать какие-то поля  недоступными для внешнего
+мира, вам надо пометить ех как личные поля структуры - поставить перед
+ними ключевое слово private и двоеточие:
+
+<div class="code">
+         struct FUNCTION {<br>
+         &nbsp;&nbsp;private:<br>
+         &nbsp;&nbsp;double coeff1,coeff2; // coefficients<br>
+<br>
+         &nbsp;&nbsp;public:<br>
+         &nbsp;&nbsp;// Inline member functions for setting coefficients<br>
+         &nbsp;&nbsp;void set(double a) {<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;coeff1 = a;<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;coeff2 = 0;<br>
+         &nbsp;&nbsp;}<br>
+<br>
+         &nbsp;&nbsp;void set(double a, double b) {<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;coeff1 = a;<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;coeff2 = b;<br>
+         &nbsp;&nbsp;}<br>
+<br>
+         &nbsp;&nbsp;// function declaration for calcullating ax+b<br>
+         &nbsp;&nbsp;double f(double x);<br>
+         };<br>
+</div>
+
+Теперь,  когда  коэффициенты   помещены  в  личную  секцию  структуры,
+воспользоваться ими  смогут только  функции-члены этой структуры  и ее
+"друзья" (о  друзьях речь пойдет  чуть дальше).  При любой  же попытке
+программы использовать коэффициенты напрямую, например
+
+<div class="code">
+            f1.coeff1 = 0;
+</div>
+
+транслятор  выдаст сообщение об ошибке.
+
+</p><p>
+
+Обратите внимание,  после ключевого слова <em>private</em>  и 
+определения полей
+<em>coeff1</em>  и <em>coeff2</em>  мы поставили  <em>public</em>, 
+имеющее  противоположный по
+сравнению с <em>private</em> смысл. <em>public</em> деалет все поля и 
+функции доступными
+внешнему  миру.  Если  бы   мы  его  не  поставили,  действие  
+<em>private</em>
+распространилось бы на всю структуру.
+
+</p><p>
+
+Метки <em>private</em> и <em>public</em>  могут появляться 
+в определении структуры много
+раз  - вы  вправе  создать в  ней  столько личных  и открытых  секций,
+сколько вам  нужно. Забегая вперед,  скажу, что есть и  третий уровень
+доступа к  полям и методам  структуры - <em>protected</em>,  
+но о нем  мы будем
+говорить, когда дойдем до наследования.
+</p>
+    </td>
+  </tr>
+</table>
+
+<br>
+
+<table width="700" border="0" cellspacing="0" cellpadding="0">
+   <tr>
+      <td align="justify">
+         <h2><a name="class_struct_diff"></a>
+	   Чем структура отличается от класса?
+	 </h2>
+<p>
+
+Итак, по умолчанию все поля  и функции структуры открыты всем ветрам -
+имеют  уровень  доступа <em>public</em>.  Это  был  
+необходимый шаг,  вызванный
+требованиями  совместивости с С.  Однако такое  умолчание противоречит
+только  что названному  принципу сокрытия  информации. С  точки зрения
+объектно-ориентированного   программирования  гораздо   правильнее  по
+умолчанию делать  все поля недоступными внешнему  миру (<em>private</em>), 
+явно
+разрешая  доступ лишь  к интерфейсу  - той  части,  которая занимается
+общением с внешним миром. Убрать это противоречие позволяет С++-класс.
+
+</p><p>
+
+Превратить структуру  в класс очень  просто - вы лишь  должны заменить
+ключевое слово <em>struct</em> на class. Единственное, что при этом 
+изменится -
+права доступа по  умолчанию. В классе все поля  и функции, для которых
+явно не  указан уровень доступа, считаются личными  (<em>private</em>). 
+Вот как
+выглядит тип <em>FUNCTION</em>, оформленный в виде класса:
+
+<div class="code">
+         class FUNCTION {<br>
+         &nbsp;&nbsp;double coeff1,coeff2; // private fields - coefficients<br>
+<br>
+         public:<br>
+         &nbsp;&nbsp;// Inline member functions for setting coefficients<br>
+         &nbsp;&nbsp;void set(double a) {<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;coeff1 = a;<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;coeff2 = 0;<br>
+         &nbsp;&nbsp;}<br>
+<br>
+         &nbsp;&nbsp;void set(double a, double b) {<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;coeff1 = a;<br>
+         &nbsp;&nbsp;&nbsp;&nbsp;coeff2 = b;<br>
+         &nbsp;&nbsp;}<br>
+<br>
+         &nbsp;&nbsp;// function declaration for calcullating ax+b<br>
+         &nbsp;&nbsp;double f(double x);<br>
+         };<br>
+</div>
+
+Как видите, все отличия от самого первого варианта <em>FUNCTION</em> 
+- ключевое
+слово <em>class</em>  и явное указание доступа <em>public</em>.   
+Все остальное осталось
+без  изменений.  А  коль  скоро  при  этом  класс  более  принципам
+соответствует  принципам ООП,  то отныне  мы  будем  везде  
+использовать его,  а  не структуру.
+</p>
+    </td>
+  </tr>
+</table>
+
+<br>
+
+<table width="700" border="0" cellspacing="0" cellpadding="0">
+   <tr>
+      <td align="justify">
+         <h2><a name="class_friends"></a>Друзья классов</h2>
+<p>
+
+Друзья классов - последнее, о чем я собираюсь рассказать на этом
+занятии. 
+
+</p><p>
+
+При  разработке  программ  случается,  что  одних  функций-членов  для
+доступа к личным полям не хватает. Это не обязательно признак просчета
+при разработке классов, просто  некоторые проблемы невозможно решить с
+помощью функций-членов.  Например, что делать,  если функции требуется
+полный доступ к полям двух классов? Для того, чтобы в подобных случаях
+не приходилось делать поля  публичными, С++ позволяет классу объявлять
+друзей (friends)  - функции и классы,  у которых есть  полный доступ к
+начинке класса (такой же доступ, как у его собственных функций). Делается это
+с помощью ключевого слова <em>friend</em>.  В приведенном ниже примере в классе
+<em>A</em> определяются friend-функция <em>print_fields(A a)</em> 
+и friend-класс <em>B</em>.
+
+<div class="code">
+        // Forward declaration of class B;<br>
+        class B;<br>
+<br>
+        // class A definition<br>
+        class A {<br>
+        &nbsp;&nbsp;int n1, n2;<br>
+<br>
+        &nbsp;&nbsp;friend void print_fields(A a);<br>
+        &nbsp;&nbsp;friend class B;<br>
+<br>
+        public:<br>
+        &nbsp;&nbsp;set_fields(n_1,n_2) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;n1 = n_1;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;n2 = n_2;<br>
+        &nbsp;&nbsp;}<br>
+        };<br>
+<br>
+        void print_fields(A a) {<br>
+        &nbsp;&nbsp;cout &lt;&lt; a.n1 &lt;&lt; " " &lt;&lt; a.n2 &lt;&lt; endl;<br>
+        }<br>
+</div>
+
+Функция <em>print_fields(A a)</em> имеет полный доступ к личным 
+полям класса <em>A</em>,
+поскольку   она   объявлена   friend-функцией  класса.    Заметьте   -
+friend-объявление  распространяется  только  на  функцию  с  указанной
+сигнатурой,  в нашем  случае <em>print_fields(A)</em>,  а не  на все  
+функции с
+именем <em>print_fields</em>. Что касается объявления
+
+<div class="incode">
+       friend class B;
+</div>
+
+то оно делает поля класса  <em>A</em> доступными для всех 
+функций-членов класса <em>B</em>.
+
+</p><p>
+
+Функции и  классы-друзья незаменимы там, где разные  типы данных тесно
+связаны между собой, но реализовывать  их в одном классе невыгодно или
+просто невозможно.   Хороший пример этому -  С++-стиль ввода-вывода, в
+котором  именно дружественные  функции позволяют  разрабатывать версии
+операторов &lt;&lt; и >> для вновь создаваемых классов.
+
+</p><p>
+
+На  этом  сегодняшнее  занятие  закончено.   На  следующем  занятии  я
+собираюсь  говорить  о  конструкторах  и деструкторах,  отвечающих  за
+создание  и уничтожение  объектов.  Также  рассчитываю показать  вам в
+следующий  раз, как  правильно  оформлять файлы  заголовков для  ваших
+классов.
+</p>
+    </td>
+  </tr>
+</table>
+
+
+</div>
+</body>
+</html>
